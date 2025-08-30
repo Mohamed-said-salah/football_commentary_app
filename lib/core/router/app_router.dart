@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:football_commentary_app/core/di/dependency_injection.dart';
 import 'package:football_commentary_app/core/router/routes.dart';
+import 'package:football_commentary_app/features/matches/presentation/views/matches_view.dart';
 import 'package:football_commentary_app/features/splash/presentation/views/splash_view.dart';
 import 'package:football_commentary_app/features/auth/presentation/views/login_view.dart';
-import 'package:football_commentary_app/features/matches/presentation/views/matches_view.dart';
-import 'package:football_commentary_app/features/voice_chat/presentation/views/voice_chat_rooms_view.dart';
 import 'package:football_commentary_app/features/voice_chat/presentation/views/voice_chat_room_view.dart';
 import 'package:football_commentary_app/features/matches/presentation/logic/cubit/matches_cubit.dart';
 import 'package:football_commentary_app/features/voice_chat/presentation/logic/cubit/voice_chat_cubit.dart';
@@ -45,20 +44,6 @@ abstract class AppRouter {
               (context) => BlocProvider(
                 create: (context) => getIt<MatchesCubit>(),
                 child: const MatchesView(),
-              ),
-          settings: settings,
-        );
-
-      case Routes.voiceChatRoomsView:
-        final args = settings.arguments as Map<String, dynamic>?;
-        return MaterialPageRoute(
-          builder:
-              (context) => BlocProvider(
-                create: (context) => getIt<VoiceChatCubit>(),
-                child: VoiceChatRoomsView(
-                  matchId: args?['matchId'],
-                  matchName: args?['matchName'],
-                ),
               ),
           settings: settings,
         );

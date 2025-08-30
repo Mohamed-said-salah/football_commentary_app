@@ -285,13 +285,11 @@ class _SingleMatchVoiceRoomsViewState extends State<SingleMatchVoiceRoomsView> {
         backgroundColor: AppColors.primaryColor,
         elevation: 0,
         actions: [
-          // Back to all rooms button
+          // Refresh button
           IconButton(
-            icon: Icon(Icons.list, color: Colors.white),
-            onPressed: () {
-              context.push(Routes.allVoiceChatRoomsView, {});
-            },
-            tooltip: 'View All Rooms',
+            onPressed: _refreshRooms,
+            icon: Icon(Icons.refresh, color: Colors.white),
+            tooltip: 'Refresh Rooms',
           ),
         ],
       ),
@@ -374,16 +372,6 @@ class _SingleMatchVoiceRoomsViewState extends State<SingleMatchVoiceRoomsView> {
                             ),
                           ],
                         ),
-                      ),
-                      // Refresh button
-                      IconButton(
-                        onPressed: _refreshRooms,
-                        icon: Icon(
-                          Icons.refresh,
-                          color: AppColors.primaryColor,
-                          size: 20.sp,
-                        ),
-                        tooltip: 'Refresh Rooms',
                       ),
                     ],
                   ),
@@ -472,7 +460,6 @@ class _SingleMatchVoiceRoomsViewState extends State<SingleMatchVoiceRoomsView> {
           Text(
             'No voice chat rooms for this match',
             style: AppTextStyles.font18BlackBold,
-            textAlign: TextAlign.center,
           ),
           SizedBox(height: 8.h),
           Text(
@@ -502,11 +489,7 @@ class _SingleMatchVoiceRoomsViewState extends State<SingleMatchVoiceRoomsView> {
         children: [
           Icon(Icons.error_outline, size: 64.sp, color: AppColors.errorColor),
           SizedBox(height: 16.h),
-          Text(
-            'Something went wrong',
-            style: AppTextStyles.font18BlackBold,
-            textAlign: TextAlign.center,
-          ),
+          Text('Something went wrong', style: AppTextStyles.font18BlackBold),
           SizedBox(height: 8.h),
           Text(
             message,
