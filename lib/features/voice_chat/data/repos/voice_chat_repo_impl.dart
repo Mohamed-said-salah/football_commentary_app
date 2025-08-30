@@ -213,7 +213,7 @@ class VoiceChatRepoImpl implements VoiceChatRepo {
   }
 
   @override
-  Future<Either<Failure, void>> joinRoom(String roomId, String userId) async {
+  Future<Either<Failure, void>> joinRoom(String roomId, String userId, {String? userName}) async {
     try {
       // Check if room exists and is active
       final roomSnapshot =
@@ -231,15 +231,21 @@ class VoiceChatRepoImpl implements VoiceChatRepo {
         return const Left(ServerFailure('Room is full'));
       }
 
-      // Add user as participant
+      // Add user as participant with name if provided
+      final participantData = {
+        'user_id': userId,
+        'joined_at': DateTime.now().millisecondsSinceEpoch,
+      };
+      
+      if (userName != null && userName.isNotEmpty) {
+        participantData['user_name'] = userName;
+      }
+
       await _database
           .child('voice_chat_participants')
           .child(roomId)
           .child(userId)
-          .set({
-            'user_id': userId,
-            'joined_at': DateTime.now().millisecondsSinceEpoch,
-          });
+          .set(participantData);
 
       // Update participant count
       await _database
@@ -392,5 +398,35 @@ class VoiceChatRepoImpl implements VoiceChatRepo {
 
       return rooms;
     });
+  }
+
+  @override
+  Future<Either<Failure, List<Map<String, dynamic>>>> getRoomParticipants(String roomId) async {
+    try {
+      final participantsSnapshot = await _database
+          .child('voice_chat_participants')
+          .child(roomId)
+          .get();
+
+      if (!participantsSnapshot.exists) {
+        return const Right([]);
+      }
+
+      final participants = <Map<String, dynamic>>[];
+      final data = participantsSnapshot.value as Map<dynamic, dynamic>;
+
+      data.forEach((key, value) {
+        final participantData = Map<String, dynamic>.from(value as Map);
+        participants.add({
+          'user_id': participantData['user_id'] ?? key.toString(),
+          'user_name': participantData['user_name'] ?? 'Unknown User',
+          'joined_at': participantData['joined_at'],
+        });
+      });
+
+      return Right(participants);
+    } catch (e) {
+      return Left(ServerFailure('Failed to get room participants: ${e.toString()}'));
+    }
   }
 }

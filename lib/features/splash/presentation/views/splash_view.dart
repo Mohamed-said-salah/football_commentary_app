@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:football_commentary_app/core/di/dependency_injection.dart';
+import 'package:football_commentary_app/core/extensions/context_extensions.dart';
 import 'package:football_commentary_app/core/router/routes.dart';
 import 'package:football_commentary_app/core/utils/app_colors.dart';
 import 'package:football_commentary_app/core/utils/app_text_styles.dart';
@@ -24,25 +24,25 @@ class _SplashViewState extends State<SplashView> {
   void _checkAuthStatus() async {
     print('🚀 SPLASH VIEW: Starting authentication check...');
     await Future.delayed(const Duration(seconds: 2));
-    
+
     if (mounted) {
       final authCubit = getIt<AuthCubit>();
-      
+
       // Wait for auth cubit to initialize
       print('🚀 SPLASH VIEW: Waiting for auth cubit initialization...');
       await Future.delayed(const Duration(milliseconds: 500));
-      
+
       // Check if user is logged in
       final isLoggedIn = await authCubit.isUserLoggedIn();
       print('🚀 SPLASH VIEW: User logged in: $isLoggedIn');
-      
+
       if (mounted) {
         if (isLoggedIn) {
           print('🚀 SPLASH VIEW: User is authenticated, navigating to matches');
-          Navigator.of(context).pushReplacementNamed(Routes.matchesView);
+          context.pushAndRemoveUntil(Routes.matchesView, {});
         } else {
           print('🚀 SPLASH VIEW: User not authenticated, navigating to login');
-          Navigator.of(context).pushReplacementNamed(Routes.loginView);
+          context.pushAndRemoveUntil(Routes.loginView, {});
         }
       }
     }
@@ -77,9 +77,9 @@ class _SplashViewState extends State<SplashView> {
                 color: AppColors.primaryColor,
               ),
             ),
-            
+
             SizedBox(height: 24.h),
-            
+
             // App Name
             Text(
               'Football Commentary',
@@ -87,18 +87,18 @@ class _SplashViewState extends State<SplashView> {
                 color: Colors.white,
               ),
             ),
-            
+
             SizedBox(height: 8.h),
-            
+
             Text(
               'Live matches & voice chat',
               style: AppTextStyles.font16WhiteMedium.copyWith(
                 color: Colors.white.withOpacity(0.8),
               ),
             ),
-            
+
             SizedBox(height: 48.h),
-            
+
             // Loading indicator
             const CircularProgressIndicator(
               valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
@@ -109,4 +109,3 @@ class _SplashViewState extends State<SplashView> {
     );
   }
 }
-

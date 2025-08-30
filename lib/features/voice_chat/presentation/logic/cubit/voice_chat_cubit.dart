@@ -7,6 +7,7 @@ import 'package:football_commentary_app/features/voice_chat/domain/use_cases/cre
 import 'package:football_commentary_app/features/voice_chat/domain/use_cases/get_rooms_use_case.dart';
 import 'package:football_commentary_app/features/voice_chat/domain/use_cases/join_room_use_case.dart';
 import 'package:football_commentary_app/features/voice_chat/domain/use_cases/leave_room_use_case.dart';
+import 'package:football_commentary_app/features/voice_chat/domain/use_cases/get_room_participants_use_case.dart';
 import 'package:football_commentary_app/features/voice_chat/presentation/logic/cubit/voice_chat_state.dart';
 
 class VoiceChatCubit extends Cubit<VoiceChatState> {
@@ -14,22 +15,26 @@ class VoiceChatCubit extends Cubit<VoiceChatState> {
   final GetRoomsUseCase _getRoomsUseCase;
   final JoinRoomUseCase _joinRoomUseCase;
   final LeaveRoomUseCase _leaveRoomUseCase;
+  final GetRoomParticipantsUseCase _getRoomParticipantsUseCase;
 
   RtcEngine? _engine;
   StreamSubscription? _roomsSubscription;
   String? _currentChannelName;
   int? _currentUid;
   final Set<int> _remoteUsers = {};
+  List<Map<String, dynamic>> _roomParticipants = [];
 
   VoiceChatCubit({
     required CreateRoomUseCase createRoomUseCase,
     required GetRoomsUseCase getRoomsUseCase,
     required JoinRoomUseCase joinRoomUseCase,
     required LeaveRoomUseCase leaveRoomUseCase,
+    required GetRoomParticipantsUseCase getRoomParticipantsUseCase,
   }) : _createRoomUseCase = createRoomUseCase,
        _getRoomsUseCase = getRoomsUseCase,
        _joinRoomUseCase = joinRoomUseCase,
        _leaveRoomUseCase = leaveRoomUseCase,
+       _getRoomParticipantsUseCase = getRoomParticipantsUseCase,
        super(VoiceChatInitial());
 
   Future<void> initializeAgora() async {
@@ -293,11 +298,15 @@ class VoiceChatCubit extends Cubit<VoiceChatState> {
     }
   }
 
-  Future<void> joinRoom(String roomId, String userId) async {
-    final result = await _joinRoomUseCase(roomId, userId);
+  Future<void> joinRoom(String roomId, String userId, {String? userName}) async {
+    final result = await _joinRoomUseCase(roomId, userId, userName: userName);
     result.fold(
       (failure) => emit(VoiceChatError(failure.message)),
-      (_) => emit(VoiceChatJoined(roomId)),
+      (_) async {
+        emit(VoiceChatJoined(roomId));
+        // Load participants after joining
+        await _loadRoomParticipants(roomId);
+      },
     );
   }
 
@@ -332,6 +341,22 @@ class VoiceChatCubit extends Cubit<VoiceChatState> {
   Set<int> get remoteUsers => _remoteUsers;
   String? get currentChannelName => _currentChannelName;
   int? get currentUid => _currentUid;
+  List<Map<String, dynamic>> get roomParticipants => _roomParticipants;
+
+  Future<void> _loadRoomParticipants(String roomId) async {
+    final result = await _getRoomParticipantsUseCase(roomId);
+    result.fold(
+      (failure) {
+        print('❌ VoiceChat Cubit: Failed to load participants: ${failure.message}');
+      },
+      (participants) {
+        _roomParticipants = participants;
+        print('✅ VoiceChat Cubit: Loaded ${participants.length} participants');
+        // Emit a state to notify UI about participants update
+        emit(VoiceChatParticipantsUpdated(participants));
+      },
+    );
+  }
 
   @override
   Future<void> close() async {

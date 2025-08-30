@@ -24,6 +24,7 @@ import 'package:football_commentary_app/features/voice_chat/domain/use_cases/cre
 import 'package:football_commentary_app/features/voice_chat/domain/use_cases/get_rooms_use_case.dart';
 import 'package:football_commentary_app/features/voice_chat/domain/use_cases/join_room_use_case.dart';
 import 'package:football_commentary_app/features/voice_chat/domain/use_cases/leave_room_use_case.dart';
+import 'package:football_commentary_app/features/voice_chat/domain/use_cases/get_room_participants_use_case.dart';
 import 'package:football_commentary_app/features/voice_chat/presentation/logic/cubit/voice_chat_cubit.dart';
 
 final getIt = GetIt.instance;
@@ -106,6 +107,8 @@ Future<void> setupGetIt() async {
 
   getIt.registerFactory(() => LeaveRoomUseCase(getIt<VoiceChatRepo>()));
 
+  getIt.registerFactory(() => GetRoomParticipantsUseCase(getIt<VoiceChatRepo>()));
+
   // Voice Chat Cubit
   getIt.registerFactory(
     () => VoiceChatCubit(
@@ -113,6 +116,7 @@ Future<void> setupGetIt() async {
       getRoomsUseCase: getIt(),
       joinRoomUseCase: getIt(),
       leaveRoomUseCase: getIt(),
+      getRoomParticipantsUseCase: getIt(),
     ),
   );
 }

@@ -12,8 +12,9 @@ abstract class VoiceChatRepo {
     required String createdBy,
     required String createdByName,
   });
-  Future<Either<Failure, void>> joinRoom(String roomId, String userId);
+  Future<Either<Failure, void>> joinRoom(String roomId, String userId, {String? userName});
   Future<Either<Failure, void>> leaveRoom(String roomId, String userId);
+  Future<Either<Failure, List<Map<String, dynamic>>>> getRoomParticipants(String roomId);
   Stream<List<VoiceChatRoomEntity>> getRoomsStream();
   Stream<List<VoiceChatRoomEntity>> getRoomsByMatchStream(int matchId);
 }

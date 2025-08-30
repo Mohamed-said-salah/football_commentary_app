@@ -92,3 +92,11 @@ class AgoraError extends VoiceChatState {
   List<Object> get props => [message];
 }
 
+class VoiceChatParticipantsUpdated extends VoiceChatState {
+  final List<Map<String, dynamic>> participants;
+
+  const VoiceChatParticipantsUpdated(this.participants);
+
+  @override
+  List<Object> get props => [participants];
+}

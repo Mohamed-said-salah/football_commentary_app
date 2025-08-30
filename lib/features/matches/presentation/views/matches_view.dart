@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:football_commentary_app/core/extensions/context_extensions.dart';
 import 'package:football_commentary_app/core/router/routes.dart';
 import 'package:football_commentary_app/core/utils/app_colors.dart';
 import 'package:football_commentary_app/core/utils/app_text_styles.dart';
@@ -37,19 +38,12 @@ class _MatchesViewState extends State<MatchesView> {
         backgroundColor: AppColors.primaryColor,
         elevation: 0,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.chat, color: Colors.white),
-            onPressed: () {
-              // Navigate to all voice chat rooms (no specific match)
-              Navigator.of(context).pushNamed(Routes.voiceChatRoomsView);
-            },
-          ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: Colors.white),
             onSelected: (value) {
               if (value == 'logout') {
                 getIt<AuthCubit>().signOut();
-                Navigator.of(context).pushReplacementNamed(Routes.loginView);
+                context.pushAndRemoveUntil(Routes.loginView, {});
               }
             },
             itemBuilder:
@@ -147,10 +141,10 @@ class _MatchesViewState extends State<MatchesView> {
                   onTap: () {
                     // Navigate to single match voice chat rooms
                     final matchName = '${match.homeTeam} vs ${match.awayTeam}';
-                    Navigator.of(context).pushNamed(
-                      Routes.singleMatchVoiceRoomsView,
-                      arguments: {'matchId': match.id, 'matchName': matchName},
-                    );
+                    context.push(Routes.singleMatchVoiceRoomsView, {
+                      'matchId': match.id,
+                      'matchName': matchName,
+                    });
                   },
                 );
               },

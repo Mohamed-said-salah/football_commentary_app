@@ -37,12 +37,16 @@ class _VoiceChatRoomViewState extends State<VoiceChatRoomView> {
     final cubit = context.read<VoiceChatCubit>();
     await cubit.initializeAgora();
     await cubit.joinVoiceChannel(widget.roomId);
-    
+
     // Join room in Firebase
     final authCubit = getIt<AuthCubit>();
     final authState = authCubit.state;
     if (authState is AuthAuthenticated) {
-      await cubit.joinRoom(widget.roomId, authState.user.id);
+      await cubit.joinRoom(
+        widget.roomId,
+        authState.user.id,
+        userName: authState.user.name,
+      );
     }
   }
 
@@ -55,7 +59,7 @@ class _VoiceChatRoomViewState extends State<VoiceChatRoomView> {
   Future<void> _leaveRoom() async {
     final cubit = context.read<VoiceChatCubit>();
     await cubit.leaveVoiceChannel();
-    
+
     // Leave room in Firebase
     final authCubit = getIt<AuthCubit>();
     final authState = authCubit.state;
@@ -73,10 +77,7 @@ class _VoiceChatRoomViewState extends State<VoiceChatRoomView> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text(
-            widget.roomName,
-            style: AppTextStyles.font18WhiteBold,
-          ),
+          title: Text(widget.roomName, style: AppTextStyles.font18WhiteBold),
           backgroundColor: AppColors.primaryColor,
           elevation: 0,
           leading: IconButton(
@@ -125,7 +126,8 @@ class _VoiceChatRoomViewState extends State<VoiceChatRoomView> {
               Container(
                 width: double.infinity,
                 padding: EdgeInsets.all(16.w),
-                color: _isJoined ? AppColors.successColor : AppColors.warningColor,
+                color:
+                    _isJoined ? AppColors.successColor : AppColors.warningColor,
                 child: Text(
                   _isJoined ? 'Connected to voice chat' : 'Connecting...',
                   style: AppTextStyles.font14BlackRegular.copyWith(
@@ -146,51 +148,93 @@ class _VoiceChatRoomViewState extends State<VoiceChatRoomView> {
                     return Column(
                       children: [
                         SizedBox(height: 32.h),
-                        
+
                         // Room info
                         Icon(
                           Icons.mic,
                           size: 80.sp,
                           color: AppColors.primaryColor,
                         ),
-                        
+
                         SizedBox(height: 16.h),
-                        
+
                         Text(
                           widget.roomName,
                           style: AppTextStyles.font24BlackBold,
                           textAlign: TextAlign.center,
                         ),
-                        
+
                         SizedBox(height: 8.h),
-                        
+
                         Text(
                           '${remoteUsers.length + (currentUid != null ? 1 : 0)} participants',
                           style: AppTextStyles.font16BlackMedium,
                         ),
-                        
+
                         SizedBox(height: 32.h),
-                        
+
                         // Participants grid
                         if (currentUid != null || remoteUsers.isNotEmpty)
                           Expanded(
-                            child: GridView.builder(
-                              padding: EdgeInsets.all(16.w),
-                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 3,
-                                crossAxisSpacing: 16.w,
-                                mainAxisSpacing: 16.h,
-                                childAspectRatio: 1,
-                              ),
-                              itemCount: remoteUsers.length + (currentUid != null ? 1 : 0),
-                              itemBuilder: (context, index) {
-                                final isCurrentUser = index == 0 && currentUid != null;
-                                final uid = isCurrentUser ? currentUid! : remoteUsers.elementAt(index - (currentUid != null ? 1 : 0));
-                                
-                                return _buildParticipantCard(
-                                  uid: uid,
-                                  isCurrentUser: isCurrentUser,
-                                  isMuted: isCurrentUser ? _isMuted : false,
+                            child: BlocBuilder<VoiceChatCubit, VoiceChatState>(
+                              builder: (context, state) {
+                                final cubit = context.read<VoiceChatCubit>();
+                                final participants = cubit.roomParticipants;
+
+                                return GridView.builder(
+                                  padding: EdgeInsets.all(16.w),
+                                  gridDelegate:
+                                      SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: 3,
+                                        crossAxisSpacing: 16.w,
+                                        mainAxisSpacing: 16.h,
+                                        childAspectRatio: 1,
+                                      ),
+                                  itemCount:
+                                      remoteUsers.length +
+                                      (currentUid != null ? 1 : 0),
+                                  itemBuilder: (context, index) {
+                                    final isCurrentUser =
+                                        index == 0 && currentUid != null;
+                                    final uid =
+                                        isCurrentUser
+                                            ? currentUid!
+                                            : remoteUsers.elementAt(
+                                              index -
+                                                  (currentUid != null ? 1 : 0),
+                                            );
+
+                                    // Find participant info
+                                    String displayName = 'Unknown User';
+                                    if (isCurrentUser) {
+                                      final authCubit = getIt<AuthCubit>();
+                                      final authState = authCubit.state;
+                                      if (authState is AuthAuthenticated) {
+                                        displayName = authState.user.name;
+                                      }
+                                    } else {
+                                      // Find remote user info from participants
+                                      final participant = participants
+                                          .firstWhere(
+                                            (p) =>
+                                                p['user_id'] == uid.toString(),
+                                            orElse:
+                                                () => {
+                                                  'user_name': 'User $uid',
+                                                },
+                                          );
+                                      displayName =
+                                          participant['user_name'] ??
+                                          'User $uid';
+                                    }
+
+                                    return _buildParticipantCard(
+                                      uid: uid,
+                                      isCurrentUser: isCurrentUser,
+                                      isMuted: isCurrentUser ? _isMuted : false,
+                                      displayName: displayName,
+                                    );
+                                  },
                                 );
                               },
                             ),
@@ -220,7 +264,10 @@ class _VoiceChatRoomViewState extends State<VoiceChatRoomView> {
                     // Mute/Unmute button
                     FloatingActionButton(
                       onPressed: _toggleMute,
-                      backgroundColor: _isMuted ? AppColors.errorColor : AppColors.primaryColor,
+                      backgroundColor:
+                          _isMuted
+                              ? AppColors.errorColor
+                              : AppColors.primaryColor,
                       child: Icon(
                         _isMuted ? Icons.mic_off : Icons.mic,
                         color: Colors.white,
@@ -234,10 +281,7 @@ class _VoiceChatRoomViewState extends State<VoiceChatRoomView> {
                         Navigator.of(context).pop();
                       },
                       backgroundColor: AppColors.errorColor,
-                      child: const Icon(
-                        Icons.call_end,
-                        color: Colors.white,
-                      ),
+                      child: const Icon(Icons.call_end, color: Colors.white),
                     ),
                   ],
                 ),
@@ -253,6 +297,7 @@ class _VoiceChatRoomViewState extends State<VoiceChatRoomView> {
     required int uid,
     required bool isCurrentUser,
     required bool isMuted,
+    required String displayName,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -272,7 +317,11 @@ class _VoiceChatRoomViewState extends State<VoiceChatRoomView> {
                 radius: 24.r,
                 backgroundColor: AppColors.primaryColor,
                 child: Text(
-                  isCurrentUser ? 'You' : uid.toString().substring(0, 2),
+                  isCurrentUser
+                      ? 'You'
+                      : displayName.isNotEmpty
+                      ? displayName.substring(0, 1).toUpperCase()
+                      : uid.toString().substring(0, 2),
                   style: AppTextStyles.font14BlackRegular.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -300,7 +349,7 @@ class _VoiceChatRoomViewState extends State<VoiceChatRoomView> {
           ),
           SizedBox(height: 8.h),
           Text(
-            isCurrentUser ? 'You' : 'User $uid',
+            isCurrentUser ? 'You' : displayName,
             style: AppTextStyles.font12BlackRegular,
             textAlign: TextAlign.center,
             maxLines: 1,
@@ -323,4 +372,3 @@ class _VoiceChatRoomViewState extends State<VoiceChatRoomView> {
     });
   }
 }
-
