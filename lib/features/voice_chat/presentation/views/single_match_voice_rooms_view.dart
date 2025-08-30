@@ -39,7 +39,7 @@ class _SingleMatchVoiceRoomsViewState extends State<SingleMatchVoiceRoomsView> {
     // Initialize Agora first
     context.read<VoiceChatCubit>().initializeAgora();
 
-    // Load rooms for this specific match - use non-stream method for initial load
+    // Load rooms for this specific match
     _loadRooms();
   }
 
@@ -53,112 +53,223 @@ class _SingleMatchVoiceRoomsViewState extends State<SingleMatchVoiceRoomsView> {
     _loadRooms();
   }
 
-  void _showCreateRoomDialog(BuildContext context) {
-    print('🚀 SINGLE MATCH VOICE ROOMS: _showCreateRoomDialog called');
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          'Voice Chat - ${widget.matchName}',
+          style: AppTextStyles.font18WhiteBold,
+        ),
+        backgroundColor: AppColors.primaryColor,
+        elevation: 0,
+        actions: [
+          IconButton(
+            onPressed: _refreshRooms,
+            icon: Icon(Icons.refresh, color: Colors.white),
+            tooltip: 'Refresh Rooms',
+          ),
+        ],
+      ),
+      body: BlocListener<VoiceChatCubit, VoiceChatState>(
+        listener: _handleStateChanges,
+        child: BlocBuilder<VoiceChatCubit, VoiceChatState>(
+          builder: (context, state) {
+            return Column(
+              children: [
+                _buildMatchInfoBanner(),
+                Expanded(child: _buildContent(state)),
+              ],
+            );
+          },
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showCreateRoomDialog(context),
+        backgroundColor: AppColors.primaryColor,
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
+    );
+  }
 
-    // Check if user is authenticated
+  void _handleStateChanges(BuildContext context, VoiceChatState state) {
+    if (state is VoiceChatRoomCreated) {
+      print('✅ Room created successfully, navigating to room view');
+      context.push(Routes.voiceChatRoomView, {
+        'roomId': state.room.id,
+        'roomName': state.room.name,
+      });
+      // Refresh rooms after creation
+      Future.delayed(const Duration(milliseconds: 500), _refreshRooms);
+    } else if (state is VoiceChatError) {
+      print('❌ Error occurred: ${state.message}');
+      _showErrorSnackBar(state.message);
+    } else if (state is AgoraError) {
+      print('❌ Agora error: ${state.message}');
+      _showErrorSnackBar('Agora error: ${state.message}');
+    }
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: AppColors.errorColor),
+    );
+  }
+
+  Widget _buildMatchInfoBanner() {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(16.w),
+      decoration: BoxDecoration(
+        color: AppColors.primaryColor.withOpacity(0.1),
+        border: Border(
+          bottom: BorderSide(
+            color: AppColors.primaryColor.withOpacity(0.2),
+            width: 1,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.sports_soccer, color: AppColors.primaryColor, size: 24.sp),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(widget.matchName, style: AppTextStyles.font18BlackBold),
+                SizedBox(height: 4.h),
+                Text(
+                  'Voice Chat Rooms',
+                  style: AppTextStyles.font14GreyRegular,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContent(VoiceChatState state) {
+    if (state is VoiceChatLoading) {
+      return const _LoadingState();
+    } else if (state is VoiceChatRoomsLoaded) {
+      return _RoomsListState(
+        rooms: state.rooms,
+        matchName: widget.matchName,
+        onRefresh: _refreshRooms,
+        onCreateRoom: () => _showCreateRoomDialog(context),
+        onRoomTap: (room) {
+          context.push(Routes.voiceChatRoomView, {
+            'roomId': room.id,
+            'roomName': room.name,
+          });
+        },
+      );
+    } else if (state is VoiceChatError) {
+      return _ErrorState(message: state.message, onRetry: _refreshRooms);
+    } else if (state is AgoraError) {
+      return _ErrorState(
+        message: 'Agora error: ${state.message}',
+        onRetry: _refreshRooms,
+      );
+    } else {
+      return const _InitialState();
+    }
+  }
+
+  void _showCreateRoomDialog(BuildContext context) {
     final authCubit = getIt<AuthCubit>();
     final isAuthenticated = authCubit.state is AuthAuthenticated;
 
     if (isAuthenticated) {
-      // User is authenticated, show full dialog
-      final authState = authCubit.state as AuthAuthenticated;
-      print(
-        '✅ Single Match Voice Rooms: User is authenticated: ${authState.user.name}',
-      );
-      print('🔍 User details:');
-      print('  - ID: ${authState.user.id}');
-      print('  - Name: "${authState.user.name}"');
-      print('  - Email: ${authState.user.email}');
-      print('  - Photo URL: ${authState.user.photoUrl}');
-
-      showDialog(
-        context: context,
-        builder:
-            (dialogContext) => BlocProvider.value(
-              value: context.read<VoiceChatCubit>(),
-              child: CreateRoomDialog(
-                user: authState.user,
-                matchId: widget.matchId,
-                matchName: widget.matchName,
-                onCreateRoom: (name, description, matchId) {
-                  print(
-                    '🔍 Single Match Voice Rooms: Create room callback triggered',
-                  );
-                  print(
-                    '🔍 Single Match Voice Rooms: Room name: $name, description: $description, matchId: $matchId',
-                  );
-                  print(
-                    '🔍 Creating room with user: ${authState.user.name} (${authState.user.id})',
-                  );
-
-                  context.read<VoiceChatCubit>().createRoom(
-                    name: name,
-                    description: description,
-                    matchId: matchId ?? widget.matchId,
-                    createdBy: authState.user.id,
-                    createdByName: authState.user.name,
-                  );
-                  Navigator.of(dialogContext).pop();
-                },
-              ),
-            ),
+      _showAuthenticatedCreateDialog(
+        context,
+        authCubit.state as AuthAuthenticated,
       );
     } else {
-      // User is not authenticated, show simplified dialog
-      print(
-        '❌ Single Match Voice Rooms: User is not authenticated, showing simplified dialog',
-      );
-
-      showDialog(
-        context: context,
-        builder:
-            (dialogContext) => AlertDialog(
-              title: Text(
-                'Create Voice Chat Room',
-                style: AppTextStyles.font18BlackBold,
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.info_outline,
-                    size: 48.sp,
-                    color: AppColors.primaryColor,
-                  ),
-                  SizedBox(height: 16.h),
-                  Text(
-                    'You can create voice chat rooms without signing in!',
-                    style: AppTextStyles.font14BlackRegular,
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(dialogContext).pop();
-                    _showCreateRoomForm(context);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryColor,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: Text('Continue'),
-                ),
-              ],
-            ),
-      );
+      _showUnauthenticatedCreateDialog(context);
     }
   }
 
+  void _showAuthenticatedCreateDialog(
+    BuildContext context,
+    AuthAuthenticated authState,
+  ) {
+    showDialog(
+      context: context,
+      builder:
+          (dialogContext) => BlocProvider.value(
+            value: context.read<VoiceChatCubit>(),
+            child: CreateRoomDialog(
+              user: authState.user,
+              matchId: widget.matchId,
+              matchName: widget.matchName,
+              onCreateRoom: (name, description, matchId) {
+                context.read<VoiceChatCubit>().createRoom(
+                  name: name,
+                  description: description,
+                  matchId: matchId ?? widget.matchId,
+                  createdBy: authState.user.id,
+                  createdByName: authState.user.name,
+                );
+                Navigator.of(dialogContext).pop();
+              },
+            ),
+          ),
+    );
+  }
+
+  void _showUnauthenticatedCreateDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder:
+          (dialogContext) => AlertDialog(
+            title: Text(
+              'Create Voice Chat Room',
+              style: AppTextStyles.font18BlackBold,
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  size: 48.sp,
+                  color: AppColors.primaryColor,
+                ),
+                SizedBox(height: 16.h),
+                Text(
+                  'You can create voice chat rooms without signing in!',
+                  style: AppTextStyles.font14BlackRegular,
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(dialogContext).pop();
+                  _showCreateRoomForm(context);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryColor,
+                  foregroundColor: Colors.white,
+                ),
+                child: Text('Continue'),
+              ),
+            ],
+          ),
+    );
+  }
+
   void _showCreateRoomForm(BuildContext context) {
-    final _nameController = TextEditingController();
-    final _descriptionController = TextEditingController();
+    final nameController = TextEditingController();
+    final descriptionController = TextEditingController();
 
     showDialog(
       context: context,
@@ -173,63 +284,11 @@ class _SingleMatchVoiceRoomsViewState extends State<SingleMatchVoiceRoomsView> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Match info display
-                  Container(
-                    padding: EdgeInsets.all(8.w),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8.r),
-                      border: Border.all(color: AppColors.primaryColor),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.sports_soccer,
-                          color: AppColors.primaryColor,
-                          size: 16.sp,
-                        ),
-                        SizedBox(width: 8.w),
-                        Expanded(
-                          child: Text(
-                            'Creating room for: ${widget.matchName}',
-                            style: AppTextStyles.font14BlackRegular,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  _buildMatchInfoDisplay(),
                   SizedBox(height: 16.h),
-                  // Room name field
-                  TextFormField(
-                    controller: _nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Room Name',
-                      hintText: 'Enter room name',
-                      prefixIcon: Icon(Icons.meeting_room),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Please enter a room name';
-                      }
-                      if (value.trim().length < 3) {
-                        return 'Room name must be at least 3 characters';
-                      }
-                      return null;
-                    },
-                    maxLength: 50,
-                  ),
+                  _buildRoomNameField(nameController),
                   SizedBox(height: 16.h),
-                  // Description field
-                  TextFormField(
-                    controller: _descriptionController,
-                    decoration: const InputDecoration(
-                      labelText: 'Description (Optional)',
-                      hintText: 'Enter room description',
-                      prefixIcon: Icon(Icons.description),
-                    ),
-                    maxLines: 3,
-                    maxLength: 200,
-                  ),
+                  _buildDescriptionField(descriptionController),
                 ],
               ),
             ),
@@ -239,24 +298,13 @@ class _SingleMatchVoiceRoomsViewState extends State<SingleMatchVoiceRoomsView> {
                 child: Text('Cancel', style: AppTextStyles.font14GreyRegular),
               ),
               ElevatedButton(
-                onPressed: () {
-                  if (_nameController.text.trim().isNotEmpty) {
-                    final name = _nameController.text.trim();
-                    final description =
-                        _descriptionController.text.trim().isEmpty
-                            ? null
-                            : _descriptionController.text.trim();
-
-                    context.read<VoiceChatCubit>().createRoom(
-                      name: name,
-                      description: description,
-                      matchId: widget.matchId,
-                      createdBy: 'anonymous',
-                      createdByName: 'Anonymous User',
-                    );
-                    Navigator.of(dialogContext).pop();
-                  }
-                },
+                onPressed:
+                    () => _handleCreateRoom(
+                      context,
+                      nameController,
+                      descriptionController,
+                      dialogContext,
+                    ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryColor,
                   foregroundColor: Colors.white,
@@ -274,140 +322,94 @@ class _SingleMatchVoiceRoomsViewState extends State<SingleMatchVoiceRoomsView> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Voice Chat - ${widget.matchName}',
-          style: AppTextStyles.font18WhiteBold,
-        ),
-        backgroundColor: AppColors.primaryColor,
-        elevation: 0,
-        actions: [
-          // Refresh button
-          IconButton(
-            onPressed: _refreshRooms,
-            icon: Icon(Icons.refresh, color: Colors.white),
-            tooltip: 'Refresh Rooms',
+  Widget _buildMatchInfoDisplay() {
+    return Container(
+      padding: EdgeInsets.all(8.w),
+      decoration: BoxDecoration(
+        color: AppColors.primaryColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8.r),
+        border: Border.all(color: AppColors.primaryColor),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.sports_soccer, color: AppColors.primaryColor, size: 16.sp),
+          SizedBox(width: 8.w),
+          Expanded(
+            child: Text(
+              'Creating room for: ${widget.matchName}',
+              style: AppTextStyles.font14BlackRegular,
+            ),
           ),
         ],
-      ),
-      body: BlocListener<VoiceChatCubit, VoiceChatState>(
-        listener: (context, state) {
-          print(
-            '🔍 Single Match Voice Rooms: State changed to: ${state.runtimeType}',
-          );
-
-          if (state is VoiceChatRoomCreated) {
-            print('✅ Room created successfully, navigating to room view');
-            // Navigate to the created room
-            context.push(Routes.voiceChatRoomView, {
-              'roomId': state.room.id,
-              'roomName': state.room.name,
-            });
-            // Refresh the rooms list after creation
-            Future.delayed(const Duration(milliseconds: 500), () {
-              _refreshRooms();
-            });
-          } else if (state is VoiceChatError) {
-            print('❌ Error occurred: ${state.message}');
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: AppColors.errorColor,
-              ),
-            );
-          } else if (state is AgoraError) {
-            print('❌ Agora error: ${state.message}');
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Agora error: ${state.message}'),
-                backgroundColor: AppColors.errorColor,
-              ),
-            );
-          }
-        },
-        child: BlocBuilder<VoiceChatCubit, VoiceChatState>(
-          builder: (context, state) {
-            print(
-              '🔍 Single Match Voice Rooms: Building with state: ${state.runtimeType}',
-            );
-
-            return Column(
-              children: [
-                // Match info banner - always visible
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.all(16.w),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryColor.withOpacity(0.1),
-                    border: Border(
-                      bottom: BorderSide(
-                        color: AppColors.primaryColor.withOpacity(0.2),
-                        width: 1,
-                      ),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.sports_soccer,
-                        color: AppColors.primaryColor,
-                        size: 24.sp,
-                      ),
-                      SizedBox(width: 12.w),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.matchName,
-                              style: AppTextStyles.font18BlackBold,
-                            ),
-                            SizedBox(height: 4.h),
-                            Text(
-                              'Voice Chat Rooms',
-                              style: AppTextStyles.font14GreyRegular,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Content area
-                Expanded(child: _buildContent(state)),
-              ],
-            );
-          },
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showCreateRoomDialog(context),
-        backgroundColor: AppColors.primaryColor,
-        child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }
 
-  Widget _buildContent(VoiceChatState state) {
-    if (state is VoiceChatLoading) {
-      return _buildLoadingState();
-    } else if (state is VoiceChatRoomsLoaded) {
-      return _buildRoomsList(state.rooms);
-    } else if (state is VoiceChatError) {
-      return _buildErrorState(state.message);
-    } else if (state is AgoraError) {
-      return _buildErrorState('Agora error: ${state.message}');
-    } else {
-      // Initial state or any other state
-      return _buildInitialState();
-    }
+  Widget _buildRoomNameField(TextEditingController controller) {
+    return TextFormField(
+      controller: controller,
+      decoration: const InputDecoration(
+        labelText: 'Room Name',
+        hintText: 'Enter room name',
+        prefixIcon: Icon(Icons.meeting_room),
+      ),
+      validator: (value) {
+        if (value == null || value.trim().isEmpty) {
+          return 'Please enter a room name';
+        }
+        if (value.trim().length < 3) {
+          return 'Room name must be at least 3 characters';
+        }
+        return null;
+      },
+      maxLength: 50,
+    );
   }
 
-  Widget _buildLoadingState() {
+  Widget _buildDescriptionField(TextEditingController controller) {
+    return TextFormField(
+      controller: controller,
+      decoration: const InputDecoration(
+        labelText: 'Description (Optional)',
+        hintText: 'Enter room description',
+        prefixIcon: Icon(Icons.description),
+      ),
+      maxLines: 3,
+      maxLength: 200,
+    );
+  }
+
+  void _handleCreateRoom(
+    BuildContext context,
+    TextEditingController nameController,
+    TextEditingController descriptionController,
+    BuildContext dialogContext,
+  ) {
+    if (nameController.text.trim().isNotEmpty) {
+      final name = nameController.text.trim();
+      final description =
+          descriptionController.text.trim().isEmpty
+              ? null
+              : descriptionController.text.trim();
+
+      context.read<VoiceChatCubit>().createRoom(
+        name: name,
+        description: description,
+        matchId: widget.matchId,
+        createdBy: 'anonymous',
+        createdByName: 'Anonymous User',
+      );
+      Navigator.of(dialogContext).pop();
+    }
+  }
+}
+
+// State Components
+class _LoadingState extends StatelessWidget {
+  const _LoadingState();
+
+  @override
+  Widget build(BuildContext context) {
     return const Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -419,14 +421,49 @@ class _SingleMatchVoiceRoomsViewState extends State<SingleMatchVoiceRoomsView> {
       ),
     );
   }
+}
 
-  Widget _buildRoomsList(List<dynamic> rooms) {
+class _InitialState extends StatelessWidget {
+  const _InitialState();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(),
+          SizedBox(height: 16),
+          Text('Initializing...'),
+        ],
+      ),
+    );
+  }
+}
+
+class _RoomsListState extends StatelessWidget {
+  final List<dynamic> rooms;
+  final String matchName;
+  final VoidCallback onRefresh;
+  final VoidCallback onCreateRoom;
+  final Function(dynamic) onRoomTap;
+
+  const _RoomsListState({
+    required this.rooms,
+    required this.matchName,
+    required this.onRefresh,
+    required this.onCreateRoom,
+    required this.onRoomTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     if (rooms.isEmpty) {
-      return _buildNoRoomsState();
+      return _EmptyRoomsState(matchName: matchName, onCreateRoom: onCreateRoom);
     }
 
     return RefreshIndicator(
-      onRefresh: () async => _refreshRooms(),
+      onRefresh: () async => onRefresh(),
       child: ListView.builder(
         padding: EdgeInsets.all(16.w),
         itemCount: rooms.length,
@@ -434,23 +471,22 @@ class _SingleMatchVoiceRoomsViewState extends State<SingleMatchVoiceRoomsView> {
           final room = rooms[index];
           return Padding(
             padding: EdgeInsets.only(bottom: 12.h),
-            child: RoomCard(
-              room: room,
-              onTap: () {
-                print('🔍 Tapping on room: ${room.name}');
-                context.push(Routes.voiceChatRoomView, {
-                  'roomId': room.id,
-                  'roomName': room.name,
-                });
-              },
-            ),
+            child: RoomCard(room: room, onTap: () => onRoomTap(room)),
           );
         },
       ),
     );
   }
+}
 
-  Widget _buildNoRoomsState() {
+class _EmptyRoomsState extends StatelessWidget {
+  final String matchName;
+  final VoidCallback onCreateRoom;
+
+  const _EmptyRoomsState({required this.matchName, required this.onCreateRoom});
+
+  @override
+  Widget build(BuildContext context) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -463,13 +499,13 @@ class _SingleMatchVoiceRoomsViewState extends State<SingleMatchVoiceRoomsView> {
           ),
           SizedBox(height: 8.h),
           Text(
-            'Create a room to start chatting about ${widget.matchName}',
+            'Create a room to start chatting about $matchName',
             style: AppTextStyles.font14GreyRegular,
             textAlign: TextAlign.center,
           ),
           SizedBox(height: 24.h),
           ElevatedButton(
-            onPressed: () => _showCreateRoomDialog(context),
+            onPressed: onCreateRoom,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primaryColor,
               foregroundColor: Colors.white,
@@ -481,8 +517,16 @@ class _SingleMatchVoiceRoomsViewState extends State<SingleMatchVoiceRoomsView> {
       ),
     );
   }
+}
 
-  Widget _buildErrorState(String message) {
+class _ErrorState extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const _ErrorState({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -498,7 +542,7 @@ class _SingleMatchVoiceRoomsViewState extends State<SingleMatchVoiceRoomsView> {
           ),
           SizedBox(height: 24.h),
           ElevatedButton(
-            onPressed: _refreshRooms,
+            onPressed: onRetry,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primaryColor,
               foregroundColor: Colors.white,
@@ -506,19 +550,6 @@ class _SingleMatchVoiceRoomsViewState extends State<SingleMatchVoiceRoomsView> {
             ),
             child: Text('Try Again'),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInitialState() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircularProgressIndicator(),
-          SizedBox(height: 16),
-          Text('Initializing...'),
         ],
       ),
     );
