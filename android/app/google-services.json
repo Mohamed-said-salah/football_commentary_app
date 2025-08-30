@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "242073384345",
+    "project_id": "football-commentary-app",
+    "storage_bucket": "football-commentary-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:242073384345:android:d1938f80347d6a356f4f08",
+        "android_client_info": {
+          "package_name": "com.example.football_commentary_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "242073384345-conm0830qt3a5cq8hgqou56dg0cf82rc.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBfHpNJEjRf5rhFgcCEf2XdJsIBfcsu2Go"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "242073384345-conm0830qt3a5cq8hgqou56dg0cf82rc.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
